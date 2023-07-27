@@ -57,11 +57,7 @@ samplers_map = {}
 
 
 def create_sampler(name, model):
-    if name is not None:
-        config = all_samplers_map.get(name, None)
-    else:
-        config = all_samplers[0]
-
+    config = all_samplers[0] if name is None else all_samplers_map.get(name, None)
     assert config is not None, f'bad sampler name: {name}'
 
     sampler = config.constructor(model)
@@ -181,7 +177,9 @@ class VanillaStableDiffusionSampler:
         conds_list, tensor = prompt_parser.reconstruct_multicond_batch(cond, self.step)
         unconditional_conditioning = prompt_parser.reconstruct_cond_batch(unconditional_conditioning, self.step)
 
-        assert all([len(conds) == 1 for conds in conds_list]), 'composition via AND is not supported for DDIM/PLMS samplers'
+        assert all(
+            len(conds) == 1 for conds in conds_list
+        ), 'composition via AND is not supported for DDIM/PLMS samplers'
         cond = tensor
 
         # for DDIM, shapes must match, we can't just process cond and uncond independently;
@@ -253,11 +251,18 @@ class VanillaStableDiffusionSampler:
         if image_conditioning is not None:
             conditioning = {"c_concat": [image_conditioning], "c_crossattn": [conditioning]}
             unconditional_conditioning = {"c_concat": [image_conditioning], "c_crossattn": [unconditional_conditioning]}
-            
-            
-        samples = self.launch_sampling(t_enc + 1, lambda: self.sampler.decode(x1, conditioning, t_enc, unconditional_guidance_scale=p.cfg_scale, unconditional_conditioning=unconditional_conditioning))
 
-        return samples
+
+        return self.launch_sampling(
+            t_enc + 1,
+            lambda: self.sampler.decode(
+                x1,
+                conditioning,
+                t_enc,
+                unconditional_guidance_scale=p.cfg_scale,
+                unconditional_conditioning=unconditional_conditioning,
+            ),
+        )
 
     def sample(self, p, x, conditioning, unconditional_conditioning, steps=None, image_conditioning=None):
         self.initialize(p)
@@ -274,9 +279,20 @@ class VanillaStableDiffusionSampler:
             conditioning = {"dummy_for_plms": np.zeros((conditioning.shape[0],)), "c_crossattn": [conditioning], "c_concat": [image_conditioning]}
             unconditional_conditioning = {"c_crossattn": [unconditional_conditioning], "c_concat": [image_conditioning]}
 
-        samples_ddim = self.launch_sampling(steps, lambda: self.sampler.sample(S=steps, conditioning=conditioning, batch_size=int(x.shape[0]), shape=x[0].shape, verbose=False, unconditional_guidance_scale=p.cfg_scale, unconditional_conditioning=unconditional_conditioning, x_T=x, eta=self.eta)[0])
-
-        return samples_ddim
+        return self.launch_sampling(
+            steps,
+            lambda: self.sampler.sample(
+                S=steps,
+                conditioning=conditioning,
+                batch_size=int(x.shape[0]),
+                shape=x[0].shape,
+                verbose=False,
+                unconditional_guidance_scale=p.cfg_scale,
+                unconditional_conditioning=unconditional_conditioning,
+                x_T=x,
+                eta=self.eta,
+            )[0],
+        )
 
 
 class CFGDenoiser(torch.nn.Module):
@@ -357,7 +373,9 @@ class TorchHijack:
         if hasattr(torch, item):
             return getattr(torch, item)
 
-        raise AttributeError("'{}' object has no attribute '{}'".format(type(self).__name__, item))
+        raise AttributeError(
+            f"'{type(self).__name__}' object has no attribute '{item}'"
+        )
 
     def randn_like(self, x):
         if self.sampler_noises:
@@ -434,11 +452,12 @@ class KDiffusionSampler:
 
         k_diffusion.sampling.torch = TorchHijack(self.sampler_noises if self.sampler_noises is not None else [])
 
-        extra_params_kwargs = {}
-        for param_name in self.extra_params:
-            if hasattr(p, param_name) and param_name in inspect.signature(self.func).parameters:
-                extra_params_kwargs[param_name] = getattr(p, param_name)
-
+        extra_params_kwargs = {
+            param_name: getattr(p, param_name)
+            for param_name in self.extra_params
+            if hasattr(p, param_name)
+            and param_name in inspect.signature(self.func).parameters
+        }
         if 'eta' in inspect.signature(self.func).parameters:
             extra_params_kwargs['eta'] = self.eta
 
@@ -456,7 +475,7 @@ class KDiffusionSampler:
 
         sigma_sched = sigmas[steps - t_enc - 1:]
         xi = x + noise * sigma_sched[0]
-        
+
         extra_params_kwargs = self.initialize(p)
         if 'sigma_min' in inspect.signature(self.func).parameters:
             ## last sigma is zero which isn't allowed by DPM Fast & Adaptive so taking value before last
@@ -473,14 +492,22 @@ class KDiffusionSampler:
         self.model_wrap_cfg.init_latent = x
         self.last_latent = x
 
-        samples = self.launch_sampling(t_enc + 1, lambda: self.func(self.model_wrap_cfg, xi, extra_args={
-            'cond': conditioning, 
-            'image_cond': image_conditioning, 
-            'uncond': unconditional_conditioning, 
-            'cond_scale': p.cfg_scale
-        }, disable=False, callback=self.callback_state, **extra_params_kwargs))
-
-        return samples
+        return self.launch_sampling(
+            t_enc + 1,
+            lambda: self.func(
+                self.model_wrap_cfg,
+                xi,
+                extra_args={
+                    'cond': conditioning,
+                    'image_cond': image_conditioning,
+                    'uncond': unconditional_conditioning,
+                    'cond_scale': p.cfg_scale,
+                },
+                disable=False,
+                callback=self.callback_state,
+                **extra_params_kwargs
+            ),
+        )
 
     def sample(self, p, x, conditioning, unconditional_conditioning, steps=None, image_conditioning = None):
         steps = steps or p.steps
@@ -504,12 +531,20 @@ class KDiffusionSampler:
             extra_params_kwargs['sigmas'] = sigmas
 
         self.last_latent = x
-        samples = self.launch_sampling(steps, lambda: self.func(self.model_wrap_cfg, x, extra_args={
-            'cond': conditioning, 
-            'image_cond': image_conditioning, 
-            'uncond': unconditional_conditioning, 
-            'cond_scale': p.cfg_scale
-        }, disable=False, callback=self.callback_state, **extra_params_kwargs))
-
-        return samples
+        return self.launch_sampling(
+            steps,
+            lambda: self.func(
+                self.model_wrap_cfg,
+                x,
+                extra_args={
+                    'cond': conditioning,
+                    'image_cond': image_conditioning,
+                    'uncond': unconditional_conditioning,
+                    'cond_scale': p.cfg_scale,
+                },
+                disable=False,
+                callback=self.callback_state,
+                **extra_params_kwargs
+            ),
+        )
 

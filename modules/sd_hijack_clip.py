@@ -165,11 +165,11 @@ class FrozenCLIPEmbedderWithCustomWordsBase(torch.nn.Module):
 
                 token_count = len(remade_tokens)
                 remade_tokens = remade_tokens + [id_end] * (maxlen - 2 - len(remade_tokens))
-                remade_tokens = [id_start] + remade_tokens[0:maxlen - 2] + [id_end]
+                remade_tokens = [id_start] + remade_tokens[:maxlen - 2] + [id_end]
                 cache[tuple_tokens] = (remade_tokens, fixes, multipliers)
 
             multipliers = multipliers + [1.0] * (maxlen - 2 - len(multipliers))
-            multipliers = [1.0] + multipliers[0:maxlen - 2] + [1.0]
+            multipliers = [1.0] + multipliers[:maxlen - 2] + [1.0]
 
             remade_batch_tokens.append(remade_tokens)
             hijack_fixes.append(fixes)
@@ -200,10 +200,7 @@ class FrozenCLIPEmbedderWithCustomWordsBase(torch.nn.Module):
 
             self.hijack.fixes = []
             for unfiltered in hijack_fixes:
-                fixes = []
-                for fix in unfiltered:
-                    if fix[0] == i:
-                        fixes.append(fix[1])
+                fixes = [fix[1] for fix in unfiltered if fix[0] == i]
                 self.hijack.fixes.append(fixes)
 
             tokens = []
@@ -261,15 +258,10 @@ class FrozenCLIPEmbedderWithCustomWords(FrozenCLIPEmbedderWithCustomWordsBase):
         for text, ident in tokens_with_parens:
             mult = 1.0
             for c in text:
-                if c == '[':
+                if c in ['[', ')']:
                     mult /= 1.1
-                if c == ']':
+                elif c in [']', '(']:
                     mult *= 1.1
-                if c == '(':
-                    mult *= 1.1
-                if c == ')':
-                    mult /= 1.1
-
             if mult != 1.0:
                 self.token_mults[ident] = mult
 
@@ -278,24 +270,22 @@ class FrozenCLIPEmbedderWithCustomWords(FrozenCLIPEmbedderWithCustomWordsBase):
         self.id_pad = self.id_end
 
     def tokenize(self, texts):
-        tokenized = self.wrapped.tokenizer(texts, truncation=False, add_special_tokens=False)["input_ids"]
-
-        return tokenized
+        return self.wrapped.tokenizer(
+            texts, truncation=False, add_special_tokens=False
+        )["input_ids"]
 
     def encode_with_transformers(self, tokens):
         outputs = self.wrapped.transformer(input_ids=tokens, output_hidden_states=-opts.CLIP_stop_at_last_layers)
 
-        if opts.CLIP_stop_at_last_layers > 1:
-            z = outputs.hidden_states[-opts.CLIP_stop_at_last_layers]
-            z = self.wrapped.transformer.text_model.final_layer_norm(z)
-        else:
-            z = outputs.last_hidden_state
+        if opts.CLIP_stop_at_last_layers <= 1:
+            return outputs.last_hidden_state
 
-        return z
+        z = outputs.hidden_states[-opts.CLIP_stop_at_last_layers]
+        return self.wrapped.transformer.text_model.final_layer_norm(z)
 
     def encode_embedding_init_text(self, init_text, nvpt):
         embedding_layer = self.wrapped.transformer.text_model.embeddings
         ids = self.wrapped.tokenizer(init_text, max_length=nvpt, return_tensors="pt", add_special_tokens=False)["input_ids"]
-        embedded = embedding_layer.token_embedding.wrapped(ids.to(devices.device)).squeeze(0)
-
-        return embedded
+        return embedding_layer.token_embedding.wrapped(
+            ids.to(devices.device)
+        ).squeeze(0)

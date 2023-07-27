@@ -165,7 +165,7 @@ class State:
         self.current_image_sampling_step = 0
 
     def dict(self):
-        obj = {
+        return {
             "skipped": self.skipped,
             "interrupted": self.skipped,
             "job": self.job,
@@ -174,8 +174,6 @@ class State:
             "sampling_step": self.sampling_step,
             "sampling_steps": self.sampling_steps,
         }
-
-        return obj
 
     def begin(self):
         self.sampling_step = 0
@@ -200,7 +198,11 @@ class State:
 
     """sets self.current_image from self.current_latent if enough sampling steps have been made after the last call to this"""
     def set_current_image(self):
-        if self.sampling_step - self.current_image_sampling_step >= opts.show_progress_every_n_steps and opts.show_progress_every_n_steps > 0:
+        if (
+            self.sampling_step - self.current_image_sampling_step
+            >= opts.show_progress_every_n_steps
+            > 0
+        ):
             self.do_set_current_image()
 
     def do_set_current_image(self):
@@ -271,35 +273,84 @@ hide_dirs = {"visible": not cmd_opts.hide_ui_dir_config}
 
 options_templates = {}
 
-options_templates.update(options_section(('saving-images', "Saving images/grids"), {
-    "samples_save": OptionInfo(True, "Always save all generated images"),
-    "samples_format": OptionInfo('png', 'File format for images'),
-    "samples_filename_pattern": OptionInfo("", "Images filename pattern", component_args=hide_dirs),
-    "save_images_add_number": OptionInfo(True, "Add number to filename when saving", component_args=hide_dirs),
-
-    "grid_save": OptionInfo(True, "Always save all generated image grids"),
-    "grid_format": OptionInfo('png', 'File format for grids'),
-    "grid_extended_filename": OptionInfo(False, "Add extended info (seed, prompt) to filename when saving grid"),
-    "grid_only_if_multiple": OptionInfo(True, "Do not save grids consisting of one picture"),
-    "grid_prevent_empty_spots": OptionInfo(False, "Prevent empty spots in grid (when set to autodetect)"),
-    "n_rows": OptionInfo(-1, "Grid row count; use -1 for autodetect and 0 for it to be same as batch size", gr.Slider, {"minimum": -1, "maximum": 16, "step": 1}),
-
-    "enable_pnginfo": OptionInfo(True, "Save text information about generation parameters as chunks to png files"),
-    "save_txt": OptionInfo(False, "Create a text file next to every image with generation parameters."),
-    "save_images_before_face_restoration": OptionInfo(False, "Save a copy of image before doing face restoration."),
-    "save_images_before_highres_fix": OptionInfo(False, "Save a copy of image before applying highres fix."),
-    "save_images_before_color_correction": OptionInfo(False, "Save a copy of image before applying color correction to img2img results"),
-    "jpeg_quality": OptionInfo(80, "Quality for saved jpeg images", gr.Slider, {"minimum": 1, "maximum": 100, "step": 1}),
-    "export_for_4chan": OptionInfo(True, "If PNG image is larger than 4MB or any dimension is larger than 4000, downscale and save copy as JPG"),
-
-    "use_original_name_batch": OptionInfo(False, "Use original name for output filename during batch process in extras tab"),
-    "save_selected_only": OptionInfo(True, "When using 'Save' button, only save a single selected image"),
-    "do_not_add_watermark": OptionInfo(False, "Do not add watermark to images"),
-
-    "temp_dir":  OptionInfo("", "Directory for temporary images; leave empty for default"),
-    "clean_temp_dir_at_start": OptionInfo(False, "Cleanup non-default temporary directory when starting webui"),
-
-}))
+options_templates |= options_section(
+    ('saving-images', "Saving images/grids"),
+    {
+        "samples_save": OptionInfo(True, "Always save all generated images"),
+        "samples_format": OptionInfo('png', 'File format for images'),
+        "samples_filename_pattern": OptionInfo(
+            "", "Images filename pattern", component_args=hide_dirs
+        ),
+        "save_images_add_number": OptionInfo(
+            True,
+            "Add number to filename when saving",
+            component_args=hide_dirs,
+        ),
+        "grid_save": OptionInfo(True, "Always save all generated image grids"),
+        "grid_format": OptionInfo('png', 'File format for grids'),
+        "grid_extended_filename": OptionInfo(
+            False,
+            "Add extended info (seed, prompt) to filename when saving grid",
+        ),
+        "grid_only_if_multiple": OptionInfo(
+            True, "Do not save grids consisting of one picture"
+        ),
+        "grid_prevent_empty_spots": OptionInfo(
+            False, "Prevent empty spots in grid (when set to autodetect)"
+        ),
+        "n_rows": OptionInfo(
+            -1,
+            "Grid row count; use -1 for autodetect and 0 for it to be same as batch size",
+            gr.Slider,
+            {"minimum": -1, "maximum": 16, "step": 1},
+        ),
+        "enable_pnginfo": OptionInfo(
+            True,
+            "Save text information about generation parameters as chunks to png files",
+        ),
+        "save_txt": OptionInfo(
+            False,
+            "Create a text file next to every image with generation parameters.",
+        ),
+        "save_images_before_face_restoration": OptionInfo(
+            False, "Save a copy of image before doing face restoration."
+        ),
+        "save_images_before_highres_fix": OptionInfo(
+            False, "Save a copy of image before applying highres fix."
+        ),
+        "save_images_before_color_correction": OptionInfo(
+            False,
+            "Save a copy of image before applying color correction to img2img results",
+        ),
+        "jpeg_quality": OptionInfo(
+            80,
+            "Quality for saved jpeg images",
+            gr.Slider,
+            {"minimum": 1, "maximum": 100, "step": 1},
+        ),
+        "export_for_4chan": OptionInfo(
+            True,
+            "If PNG image is larger than 4MB or any dimension is larger than 4000, downscale and save copy as JPG",
+        ),
+        "use_original_name_batch": OptionInfo(
+            False,
+            "Use original name for output filename during batch process in extras tab",
+        ),
+        "save_selected_only": OptionInfo(
+            True, "When using 'Save' button, only save a single selected image"
+        ),
+        "do_not_add_watermark": OptionInfo(
+            False, "Do not add watermark to images"
+        ),
+        "temp_dir": OptionInfo(
+            "", "Directory for temporary images; leave empty for default"
+        ),
+        "clean_temp_dir_at_start": OptionInfo(
+            False,
+            "Cleanup non-default temporary directory when starting webui",
+        ),
+    },
+)
 
 options_templates.update(options_section(('saving-paths', "Paths for saving"), {
     "outdir_samples": OptionInfo("", "Output directory for images; if empty, defaults to three directories below", component_args=hide_dirs),
@@ -351,25 +402,104 @@ options_templates.update(options_section(('training', "Training"), {
     "training_xattention_optimizations": OptionInfo(False, "Use cross attention optimizations while training"),
 }))
 
-options_templates.update(options_section(('sd', "Stable Diffusion"), {
-    "sd_model_checkpoint": OptionInfo(None, "Stable Diffusion checkpoint", gr.Dropdown, lambda: {"choices": list_checkpoint_tiles()}, refresh=refresh_checkpoints),
-    "sd_checkpoint_cache": OptionInfo(0, "Checkpoints to cache in RAM", gr.Slider, {"minimum": 0, "maximum": 10, "step": 1}),
-    "sd_vae": OptionInfo("auto", "SD VAE", gr.Dropdown, lambda: {"choices": sd_vae.vae_list}, refresh=sd_vae.refresh_vae_list),
-    "sd_vae_as_default": OptionInfo(False, "Ignore selected VAE for stable diffusion checkpoints that have their own .vae.pt next to them"),
-    "sd_hypernetwork": OptionInfo("None", "Hypernetwork", gr.Dropdown, lambda: {"choices": ["None"] + [x for x in hypernetworks.keys()]}, refresh=reload_hypernetworks),
-    "sd_hypernetwork_strength": OptionInfo(1.0, "Hypernetwork strength", gr.Slider, {"minimum": 0.0, "maximum": 1.0, "step": 0.001}),
-    "inpainting_mask_weight": OptionInfo(1.0, "Inpainting conditioning mask strength", gr.Slider, {"minimum": 0.0, "maximum": 1.0, "step": 0.01}),
-    "initial_noise_multiplier": OptionInfo(1.0, "Noise multiplier for img2img", gr.Slider, {"minimum": 0.5, "maximum": 1.5, "step": 0.01 }),
-    "img2img_color_correction": OptionInfo(False, "Apply color correction to img2img results to match original colors."),
-    "img2img_fix_steps": OptionInfo(False, "With img2img, do exactly the amount of steps the slider specifies (normally you'd do less with less denoising)."),
-    "enable_quantization": OptionInfo(False, "Enable quantization in K samplers for sharper and cleaner results. This may change existing seeds. Requires restart to apply."),
-    "enable_emphasis": OptionInfo(True, "Emphasis: use (text) to make model pay more attention to text and [text] to make it pay less attention"),
-    "use_old_emphasis_implementation": OptionInfo(False, "Use old emphasis implementation. Can be useful to reproduce old seeds."),
-    "enable_batch_seeds": OptionInfo(True, "Make K-diffusion samplers produce same images in a batch as when making a single image"),
-    "comma_padding_backtrack": OptionInfo(20, "Increase coherency by padding from the last comma within n tokens when using more than 75 tokens", gr.Slider, {"minimum": 0, "maximum": 74, "step": 1 }),
-    'CLIP_stop_at_last_layers': OptionInfo(1, "Clip skip", gr.Slider, {"minimum": 1, "maximum": 12, "step": 1}),
-    "random_artist_categories": OptionInfo([], "Allowed categories for random artists selection when using the Roll button", gr.CheckboxGroup, {"choices": artist_db.categories()}),
-}))
+options_templates.update(
+    options_section(
+        ('sd', "Stable Diffusion"),
+        {
+            "sd_model_checkpoint": OptionInfo(
+                None,
+                "Stable Diffusion checkpoint",
+                gr.Dropdown,
+                lambda: {"choices": list_checkpoint_tiles()},
+                refresh=refresh_checkpoints,
+            ),
+            "sd_checkpoint_cache": OptionInfo(
+                0,
+                "Checkpoints to cache in RAM",
+                gr.Slider,
+                {"minimum": 0, "maximum": 10, "step": 1},
+            ),
+            "sd_vae": OptionInfo(
+                "auto",
+                "SD VAE",
+                gr.Dropdown,
+                lambda: {"choices": sd_vae.vae_list},
+                refresh=sd_vae.refresh_vae_list,
+            ),
+            "sd_vae_as_default": OptionInfo(
+                False,
+                "Ignore selected VAE for stable diffusion checkpoints that have their own .vae.pt next to them",
+            ),
+            "sd_hypernetwork": OptionInfo(
+                "None",
+                "Hypernetwork",
+                gr.Dropdown,
+                lambda: {"choices": ["None"] + list(hypernetworks.keys())},
+                refresh=reload_hypernetworks,
+            ),
+            "sd_hypernetwork_strength": OptionInfo(
+                1.0,
+                "Hypernetwork strength",
+                gr.Slider,
+                {"minimum": 0.0, "maximum": 1.0, "step": 0.001},
+            ),
+            "inpainting_mask_weight": OptionInfo(
+                1.0,
+                "Inpainting conditioning mask strength",
+                gr.Slider,
+                {"minimum": 0.0, "maximum": 1.0, "step": 0.01},
+            ),
+            "initial_noise_multiplier": OptionInfo(
+                1.0,
+                "Noise multiplier for img2img",
+                gr.Slider,
+                {"minimum": 0.5, "maximum": 1.5, "step": 0.01},
+            ),
+            "img2img_color_correction": OptionInfo(
+                False,
+                "Apply color correction to img2img results to match original colors.",
+            ),
+            "img2img_fix_steps": OptionInfo(
+                False,
+                "With img2img, do exactly the amount of steps the slider specifies (normally you'd do less with less denoising).",
+            ),
+            "enable_quantization": OptionInfo(
+                False,
+                "Enable quantization in K samplers for sharper and cleaner results. This may change existing seeds. Requires restart to apply.",
+            ),
+            "enable_emphasis": OptionInfo(
+                True,
+                "Emphasis: use (text) to make model pay more attention to text and [text] to make it pay less attention",
+            ),
+            "use_old_emphasis_implementation": OptionInfo(
+                False,
+                "Use old emphasis implementation. Can be useful to reproduce old seeds.",
+            ),
+            "enable_batch_seeds": OptionInfo(
+                True,
+                "Make K-diffusion samplers produce same images in a batch as when making a single image",
+            ),
+            "comma_padding_backtrack": OptionInfo(
+                20,
+                "Increase coherency by padding from the last comma within n tokens when using more than 75 tokens",
+                gr.Slider,
+                {"minimum": 0, "maximum": 74, "step": 1},
+            ),
+            'CLIP_stop_at_last_layers': OptionInfo(
+                1,
+                "Clip skip",
+                gr.Slider,
+                {"minimum": 1, "maximum": 12, "step": 1},
+            ),
+            "random_artist_categories": OptionInfo(
+                [],
+                "Allowed categories for random artists selection when using the Roll button",
+                gr.CheckboxGroup,
+                {"choices": artist_db.categories()},
+            ),
+        },
+    )
+)
 
 options_templates.update(options_section(('interrogate', "Interrogate Options"), {
     "interrogate_keep_models_in_memory": OptionInfo(False, "Interrogate: keep models in VRAM"),
@@ -527,7 +657,9 @@ class Options:
             if item.section not in section_ids:
                 section_ids[item.section] = len(section_ids)
 
-        self.data_labels = {k: v for k, v in sorted(settings_items, key=lambda x: section_ids[x[1].section])}
+        self.data_labels = dict(
+            sorted(settings_items, key=lambda x: section_ids[x[1].section])
+        )
 
 
 opts = Options()

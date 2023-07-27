@@ -67,7 +67,7 @@ def encode_pil_to_base64(image):
 class Api:
     def __init__(self, app: FastAPI, queue_lock: Lock):
         if shared.cmd_opts.api_auth:
-            self.credenticals = dict()
+            self.credenticals = {}
             for auth in shared.cmd_opts.api_auth.split(","):
                 user, password = auth.split(":")
                 self.credenticals[user] = password
@@ -267,10 +267,12 @@ class Api:
         options = {}
         for key in shared.opts.data.keys():
             metadata = shared.opts.data_labels.get(key)
-            if(metadata is not None):
-                options.update({key: shared.opts.data.get(key, shared.opts.data_labels.get(key).default)})
+            if (metadata is not None):
+                options[key] = shared.opts.data.get(
+                    key, shared.opts.data_labels.get(key).default
+                )
             else:
-                options.update({key: shared.opts.data.get(key, None)})
+                options[key] = shared.opts.data.get(key, None)
 
         return options
 

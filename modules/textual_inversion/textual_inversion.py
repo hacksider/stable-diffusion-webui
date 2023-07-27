@@ -147,11 +147,14 @@ class EmbeddingDatabase:
         if possible_matches is None:
             return None, None
 
-        for ids, embedding in possible_matches:
-            if tokens[offset:offset + len(ids)] == ids:
-                return embedding, len(ids)
-
-        return None, None
+        return next(
+            (
+                (embedding, len(ids))
+                for ids, embedding in possible_matches
+                if tokens[offset : offset + len(ids)] == ids
+            ),
+            (None, None),
+        )
 
 
 def create_embedding(name, num_vectors_per_token, overwrite_old, init_text='*'):
@@ -185,7 +188,7 @@ def write_loss(log_directory, filename, step, epoch_len, values):
 
     if step % shared.opts.training_write_csv_every != 0:
         return
-    write_csv_header = False if os.path.exists(os.path.join(log_directory, filename)) else True
+    write_csv_header = not os.path.exists(os.path.join(log_directory, filename))
 
     with open(os.path.join(log_directory, filename), "a+", newline='') as fout:
         csv_writer = csv.DictWriter(fout, fieldnames=["step", "epoch", "epoch_step", *(values.keys())])

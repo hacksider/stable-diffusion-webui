@@ -84,8 +84,7 @@ class PositionEmbeddingSine(nn.Module):
         pos_y = torch.stack(
             (pos_y[:, :, :, 0::2].sin(), pos_y[:, :, :, 1::2].cos()), dim=4
         ).flatten(3)
-        pos = torch.cat((pos_y, pos_x), dim=3).permute(0, 3, 1, 2)
-        return pos
+        return torch.cat((pos_y, pos_x), dim=3).permute(0, 3, 1, 2)
 
 def _get_activation_fn(activation):
     """Return an activation function given a string"""
@@ -155,8 +154,7 @@ class Fuse_sft_block(nn.Module):
         scale = self.scale(enc_feat)
         shift = self.shift(enc_feat)
         residual = w * (dec_feat * scale + shift)
-        out = dec_feat + residual
-        return out
+        return dec_feat + residual
 
 
 @ARCH_REGISTRY.register()

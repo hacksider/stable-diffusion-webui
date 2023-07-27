@@ -49,9 +49,8 @@ def sample_ddim(self,
             cbs = ctmp.shape[0]
             if cbs != batch_size:
                 print(f"Warning: Got {cbs} conditionings but batch-size is {batch_size}")
-        else:
-            if conditioning.shape[0] != batch_size:
-                print(f"Warning: Got {conditioning.shape[0]} conditionings but batch-size is {batch_size}")
+        elif conditioning.shape[0] != batch_size:
+            print(f"Warning: Got {conditioning.shape[0]} conditionings but batch-size is {batch_size}")
 
     self.make_schedule(ddim_num_steps=S, ddim_eta=eta, verbose=verbose)
     # sampling
@@ -169,9 +168,8 @@ def sample_plms(self,
             cbs = ctmp.shape[0]
             if cbs != batch_size:
                 print(f"Warning: Got {cbs} conditionings but batch-size is {batch_size}")
-        else:
-            if conditioning.shape[0] != batch_size:
-                print(f"Warning: Got {conditioning.shape[0]} conditionings but batch-size is {batch_size}")
+        elif conditioning.shape[0] != batch_size:
+            print(f"Warning: Got {conditioning.shape[0]} conditionings but batch-size is {batch_size}")
 
     self.make_schedule(ddim_num_steps=S, ddim_eta=eta, verbose=verbose)
     # sampling
@@ -287,19 +285,16 @@ def p_sample_plms(self, x, c, t, index, repeat_noise=False, use_original_steps=F
 
 @torch.no_grad()
 def get_unconditional_conditioning(self, batch_size, null_label=None):
-    if null_label is not None:
-        xc = null_label
-        if isinstance(xc, ListConfig):
-            xc = list(xc)
-        if isinstance(xc, dict) or isinstance(xc, list):
-            c = self.get_learned_conditioning(xc)
-        else:
-            if hasattr(xc, "to"):
-                xc = xc.to(self.device)
-            c = self.get_learned_conditioning(xc)
-    else:
+    if null_label is None:
         # todo: get null label from cond_stage_model
         raise NotImplementedError()
+    xc = null_label
+    if isinstance(xc, ListConfig):
+        xc = list(xc)
+    if not isinstance(xc, dict) and not isinstance(xc, list):
+        if hasattr(xc, "to"):
+            xc = xc.to(self.device)
+    c = self.get_learned_conditioning(xc)
     c = repeat(c, "1 ... -> b ...", b=batch_size).to(self.device)
     return c
 

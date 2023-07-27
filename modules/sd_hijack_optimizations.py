@@ -83,7 +83,6 @@ def split_cross_attention_forward(self, x, context=None, mask=None):
     mem_free_torch = mem_reserved - mem_active
     mem_free_total = mem_free_cuda + mem_free_torch
 
-    gb = 1024 ** 3
     tensor_size = q.shape[0] * q.shape[1] * k.shape[1] * q.element_size()
     modifier = 3 if q.element_size() == 2 else 2.5
     mem_required = tensor_size * modifier
@@ -96,6 +95,7 @@ def split_cross_attention_forward(self, x, context=None, mask=None):
 
     if steps > 64:
         max_res = math.floor(math.sqrt(math.sqrt(mem_free_total / 2.5)) / 8) * 64
+        gb = 1024 ** 3
         raise RuntimeError(f'Not enough memory, use lower resolution (max approx. {max_res}x{max_res}). '
                            f'Need: {mem_required / 64 / gb:0.1f}GB free, Have:{mem_free_total / gb:0.1f}GB free')
 
@@ -125,10 +125,7 @@ def check_for_psutil():
     except ModuleNotFoundError:
         return False
 
-invokeAI_mps_available = check_for_psutil()
-
-# -- Taken from https://github.com/invoke-ai/InvokeAI --
-if invokeAI_mps_available:
+if invokeAI_mps_available := check_for_psutil():
     import psutil
     mem_total_gb = psutil.virtual_memory().total // (1 << 30)
 
@@ -152,11 +149,10 @@ def einsum_op_slice_1(q, k, v, slice_size):
     return r
 
 def einsum_op_mps_v1(q, k, v):
-    if q.shape[1] <= 4096: # (512x512) max q.shape[1]: 4096
+    if q.shape[1] <= 4096:
         return einsum_op_compvis(q, k, v)
-    else:
-        slice_size = math.floor(2**30 / (q.shape[0] * q.shape[1]))
-        return einsum_op_slice_1(q, k, v, slice_size)
+    slice_size = math.floor(2**30 / (q.shape[0] * q.shape[1]))
+    return einsum_op_slice_1(q, k, v, slice_size)
 
 def einsum_op_mps_v2(q, k, v):
     if mem_total_gb > 8 and q.shape[1] <= 4096:
