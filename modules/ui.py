@@ -90,9 +90,7 @@ def plaintext_to_html(text):
     return text
 
 def send_gradio_gallery_to_image(x):
-    if len(x) == 0:
-        return None
-    return image_from_url_text(x[0])
+    return None if len(x) == 0 else image_from_url_text(x[0])
 
 def save_files(js_data, images, do_make_zip, index):
     import csv
@@ -163,19 +161,17 @@ def save_files(js_data, images, do_make_zip, index):
 def calc_time_left(progress, threshold, label, force_display):
     if progress == 0:
         return ""
+    time_since_start = time.time() - shared.state.time_start
+    eta = (time_since_start/progress)
+    eta_relative = eta-time_since_start
+    if (eta_relative <= threshold or progress <= 0.02) and not force_display:
+        return ""
+    if eta_relative > 3600:
+        return label + time.strftime('%H:%M:%S', time.gmtime(eta_relative))
+    elif eta_relative > 60:
+        return label + time.strftime('%M:%S',  time.gmtime(eta_relative))
     else:
-        time_since_start = time.time() - shared.state.time_start
-        eta = (time_since_start/progress)
-        eta_relative = eta-time_since_start
-        if (eta_relative > threshold and progress > 0.02) or force_display:
-            if eta_relative > 3600:
-                return label + time.strftime('%H:%M:%S', time.gmtime(eta_relative))
-            elif eta_relative > 60:
-                return label + time.strftime('%M:%S',  time.gmtime(eta_relative))
-            else:
-                return label + time.strftime('%Ss',  time.gmtime(eta_relative))
-        else:
-            return ""
+        return label + time.strftime('%Ss',  time.gmtime(eta_relative))
 
 
 def check_progress_call(id_part):
@@ -231,10 +227,15 @@ def check_progress_call_initial(id_part):
 
 
 def roll_artist(prompt):
-    allowed_cats = set([x for x in shared.artist_db.categories() if len(opts.random_artist_categories)==0 or x in opts.random_artist_categories])
+    allowed_cats = {
+        x
+        for x in shared.artist_db.categories()
+        if len(opts.random_artist_categories) == 0
+        or x in opts.random_artist_categories
+    }
     artist = random.choice([x for x in shared.artist_db.artists if x.category in allowed_cats])
 
-    return prompt + ", " + artist.name if prompt != '' else artist.name
+    return f"{prompt}, {artist.name}" if prompt != '' else artist.name
 
 
 def visit(x, func, path=""):
@@ -242,12 +243,12 @@ def visit(x, func, path=""):
         for c in x.children:
             visit(c, func, path)
     elif x.label is not None:
-        func(path + "/" + str(x.label), x)
+        func(f"{path}/{str(x.label)}", x)
 
 
 def add_style(name: str, prompt: str, negative_prompt: str):
     if name is None:
-        return [gr_show() for x in range(4)]
+        return [gr_show() for _ in range(4)]
 
     style = modules.styles.PromptStyle(name, prompt, negative_prompt)
     shared.prompt_styles.styles[style.name] = style
@@ -374,7 +375,10 @@ def update_token_counter(text, steps):
 
     flat_prompts = reduce(lambda list1, list2: list1+list2, prompt_schedules)
     prompts = [prompt_text for step, prompt_text in flat_prompts]
-    tokens, token_count, max_length = max([model_hijack.tokenize(prompt) for prompt in prompts], key=lambda args: args[1])
+    tokens, token_count, max_length = max(
+        (model_hijack.tokenize(prompt) for prompt in prompts),
+        key=lambda args: args[1],
+    )
     style_class = ' class="red"' if (token_count > max_length) else ""
     return f"<span {style_class}>{token_count}/{max_length}</span>"
 
@@ -561,66 +565,66 @@ Requested path was: {f}
                 sp.Popen(["xdg-open", path])
 
     with gr.Column(variant='panel'):
-            with gr.Group():
-                result_gallery = gr.Gallery(label='Output', show_label=False, elem_id=f"{tabname}_gallery").style(grid=4)
+        with gr.Group():
+            result_gallery = gr.Gallery(label='Output', show_label=False, elem_id=f"{tabname}_gallery").style(grid=4)
 
-            generation_info = None
-            with gr.Column():
-                with gr.Row():
-                    if tabname != "extras":
-                        save = gr.Button('Save', elem_id=f'save_{tabname}')
-
-                    buttons = parameters_copypaste.create_buttons(["img2img", "inpaint", "extras"])
-                    button_id = "hidden_element" if shared.cmd_opts.hide_ui_dir_config else 'open_folder'
-                    open_folder_button = gr.Button(folder_symbol, elem_id=button_id)
-
-                open_folder_button.click(
-                    fn=lambda: open_folder(opts.outdir_samples or outdir),
-                    inputs=[],
-                    outputs=[],
-                )
-
+        generation_info = None
+        with gr.Column():
+            with gr.Row():
                 if tabname != "extras":
-                    with gr.Row():
-                        do_make_zip = gr.Checkbox(label="Make Zip when Save?", value=False)
+                    save = gr.Button('Save', elem_id=f'save_{tabname}')
 
-                    with gr.Row():
-                        download_files = gr.File(None, file_count="multiple", interactive=False, show_label=False, visible=False)
+                buttons = parameters_copypaste.create_buttons(["img2img", "inpaint", "extras"])
+                button_id = "hidden_element" if shared.cmd_opts.hide_ui_dir_config else 'open_folder'
+                open_folder_button = gr.Button(folder_symbol, elem_id=button_id)
 
-                    with gr.Group():
-                        html_info = gr.HTML()
-                        generation_info = gr.Textbox(visible=False)
-                        if tabname == 'txt2img' or tabname == 'img2img':
-                            generation_info_button = gr.Button(visible=False, elem_id=f"{tabname}_generation_info_button")
-                            generation_info_button.click(
-                                fn=update_generation_info,
-                                _js="(x, y) => [x, y, selected_gallery_index()]",
-                                inputs=[generation_info, html_info],
-                                outputs=[html_info],
-                                preprocess=False
-                            )
+            open_folder_button.click(
+                fn=lambda: open_folder(opts.outdir_samples or outdir),
+                inputs=[],
+                outputs=[],
+            )
 
-                        save.click(
-                            fn=wrap_gradio_call(save_files),
-                            _js="(x, y, z, w) => [x, y, z, selected_gallery_index()]",
-                            inputs=[
-                                generation_info,
-                                result_gallery,
-                                do_make_zip,
-                                html_info,
-                            ],
-                            outputs=[
-                                download_files,
-                                html_info,
-                                html_info,
-                                html_info,
-                            ]
-                        )
-                else:
-                    html_info_x = gr.HTML()
+            if tabname != "extras":
+                with gr.Row():
+                    do_make_zip = gr.Checkbox(label="Make Zip when Save?", value=False)
+
+                with gr.Row():
+                    download_files = gr.File(None, file_count="multiple", interactive=False, show_label=False, visible=False)
+
+                with gr.Group():
                     html_info = gr.HTML()
-                parameters_copypaste.bind_buttons(buttons, result_gallery, "txt2img" if tabname == "txt2img" else None)
-                return result_gallery, generation_info if tabname != "extras" else html_info_x, html_info
+                    generation_info = gr.Textbox(visible=False)
+                    if tabname in ['txt2img', 'img2img']:
+                        generation_info_button = gr.Button(visible=False, elem_id=f"{tabname}_generation_info_button")
+                        generation_info_button.click(
+                            fn=update_generation_info,
+                            _js="(x, y) => [x, y, selected_gallery_index()]",
+                            inputs=[generation_info, html_info],
+                            outputs=[html_info],
+                            preprocess=False
+                        )
+
+                    save.click(
+                        fn=wrap_gradio_call(save_files),
+                        _js="(x, y, z, w) => [x, y, z, selected_gallery_index()]",
+                        inputs=[
+                            generation_info,
+                            result_gallery,
+                            do_make_zip,
+                            html_info,
+                        ],
+                        outputs=[
+                            download_files,
+                            html_info,
+                            html_info,
+                            html_info,
+                        ]
+                    )
+            else:
+                html_info_x = gr.HTML()
+                html_info = gr.HTML()
+            parameters_copypaste.bind_buttons(buttons, result_gallery, "txt2img" if tabname == "txt2img" else None)
+            return result_gallery, generation_info if tabname != "extras" else html_info_x, html_info
 
 
 def create_ui():

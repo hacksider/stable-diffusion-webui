@@ -27,7 +27,7 @@ def process_float_tag(tag):
 
 
 def process_boolean_tag(tag):
-    return True if (tag == "true") else False
+    return tag == "true"
 
 
 prompt_tags = {
@@ -124,30 +124,26 @@ class Script(scripts.Script):
                 try:
                     args = cmdargs(line)
                 except Exception:
-                    print(f"Error parsing line [line] as commandline:", file=sys.stderr)
+                    print("Error parsing line [line] as commandline:", file=sys.stderr)
                     print(traceback.format_exc(), file=sys.stderr)
                     args = {"prompt": line}
             else:
                 args = {"prompt": line}
 
             n_iter = args.get("n_iter", 1)
-            if n_iter != 1:
-                job_count += n_iter
-            else:
-                job_count += 1
-
+            job_count += n_iter if n_iter != 1 else 1
             jobs.append(args)
 
         print(f"Will process {len(lines)} lines in {job_count} jobs.")
         if (checkbox_iterate or checkbox_iterate_batch) and p.seed == -1:
-            p.seed = int(random.randrange(4294967294))
+            p.seed = random.randrange(4294967294)
 
         state.job_count = job_count
 
         images = []
         all_prompts = []
         infotexts = []
-        for n, args in enumerate(jobs):
+        for args in jobs:
             state.job = f"{state.job_no + 1} out of {state.job_count}"
 
             copy_p = copy.copy(p)
@@ -156,7 +152,7 @@ class Script(scripts.Script):
 
             proc = process_images(copy_p)
             images += proc.images
-            
+
             if checkbox_iterate:
                 p.seed = p.seed + (p.batch_size * p.n_iter)
             all_prompts += proc.all_prompts

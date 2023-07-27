@@ -64,9 +64,9 @@ def save_pic_with_caption(image, index, params: PreprocessParams, existing_capti
     image.save(os.path.join(params.dstdir, f"{basename}.png"))
 
     if params.preprocess_txt_action == 'prepend' and existing_caption:
-        caption = existing_caption + ' ' + caption
+        caption = f'{existing_caption} {caption}'
     elif params.preprocess_txt_action == 'append' and existing_caption:
-        caption = caption + ' ' + existing_caption
+        caption = f'{caption} {existing_caption}'
     elif params.preprocess_txt_action == 'copy' and existing_caption:
         caption = existing_caption
 
@@ -94,20 +94,14 @@ def split_pic(image, inverse_xy, width, height, overlap_ratio):
         from_w, from_h = image.width, image.height
         to_w, to_h = width, height
     h = from_h * to_w // from_w
-    if inverse_xy:
-        image = image.resize((h, to_w))
-    else:
-        image = image.resize((to_w, h))
-
+    image = image.resize((h, to_w)) if inverse_xy else image.resize((to_w, h))
     split_count = math.ceil((h - to_h * overlap_ratio) / (to_h * (1.0 - overlap_ratio)))
     y_step = (h - to_h) / (split_count - 1)
     for i in range(split_count):
         y = int(y_step * i)
-        if inverse_xy:
-            splitted = image.crop((y, 0, y + to_h, to_w))
-        else:
-            splitted = image.crop((0, y, to_w, y + to_h))
-        yield splitted
+        yield image.crop((y, 0, y + to_h, to_w)) if inverse_xy else image.crop(
+            (0, y, to_w, y + to_h)
+        )
 
 
 def preprocess_work(process_src, process_dst, process_width, process_height, preprocess_txt_action, process_flip, process_split, process_caption, process_caption_deepbooru=False, split_threshold=0.5, overlap_ratio=0.2, process_focal_crop=False, process_focal_crop_face_weight=0.9, process_focal_crop_entropy_weight=0.3, process_focal_crop_edges_weight=0.5, process_focal_crop_debug=False):
@@ -145,7 +139,7 @@ def preprocess_work(process_src, process_dst, process_width, process_height, pre
         params.src = filename
 
         existing_caption = None
-        existing_caption_filename = os.path.splitext(filename)[0] + '.txt'
+        existing_caption_filename = f'{os.path.splitext(filename)[0]}.txt'
         if os.path.exists(existing_caption_filename):
             with open(existing_caption_filename, 'r', encoding="utf8") as file:
                 existing_caption = file.read()

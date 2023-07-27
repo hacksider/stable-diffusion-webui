@@ -25,10 +25,7 @@ class UpscalerScuNET(modules.upscaler.Upscaler):
         scalers = []
         add_model2 = True
         for file in model_paths:
-            if "http" in file:
-                name = self.model_name
-            else:
-                name = modelloader.friendly_name(file)
+            name = self.model_name if "http" in file else modelloader.friendly_name(file)
             if name == self.model_name2 or file == self.model_url2:
                 add_model2 = False
             try:
@@ -68,8 +65,12 @@ class UpscalerScuNET(modules.upscaler.Upscaler):
     def load_model(self, path: str):
         device = devices.get_device_for('scunet')
         if "http" in path:
-            filename = load_file_from_url(url=self.model_url, model_dir=self.model_path, file_name="%s.pth" % self.name,
-                                          progress=True)
+            filename = load_file_from_url(
+                url=self.model_url,
+                model_dir=self.model_path,
+                file_name=f"{self.name}.pth",
+                progress=True,
+            )
         else:
             filename = path
         if not os.path.exists(os.path.join(self.model_path, filename)) or filename is None:

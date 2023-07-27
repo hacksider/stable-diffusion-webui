@@ -12,7 +12,7 @@ from PIL import Image
 
 re_param_code = r'\s*([\w ]+):\s*("(?:\\|\"|[^\"])+"|[^,]*)(?:,|$)'
 re_param = re.compile(re_param_code)
-re_params = re.compile(r"^(?:" + re_param_code + "){3,}$")
+re_params = re.compile(f"^(?:{re_param_code}" + "){3,}$")
 re_imagesize = re.compile(r"^(\d+)x(\d+)$")
 type_of_gr_update = type(gr.update())
 paste_fields = {}
@@ -52,8 +52,7 @@ def image_from_url_text(filedata):
         filedata = filedata[len("data:image/png;base64,"):]
 
     filedata = base64.decodebytes(filedata.encode('utf-8'))
-    image = Image.open(io.BytesIO(filedata))
-    return image
+    return Image.open(io.BytesIO(filedata))
 
 
 def add_paste_fields(tabname, init_img, fields):
@@ -90,10 +89,7 @@ def integrate_settings_paste_fields(component_dict):
 
 
 def create_buttons(tabs_list):
-    buttons = {}
-    for tab in tabs_list:
-        buttons[tab] = gr.Button(f"Send to {tab}")
-    return buttons
+    return {tab: gr.Button(f"Send to {tab}") for tab in tabs_list}
 
 
 #if send_generate_info is a tab name, mean generate_info comes from the params fields of the tab
@@ -150,8 +146,6 @@ Steps: 20, Sampler: Euler a, CFG scale: 7, Seed: 965400086, Size: 512x512, Model
     returns a dict with field values
     """
 
-    res = {}
-
     prompt = ""
     negative_prompt = ""
 
@@ -162,7 +156,7 @@ Steps: 20, Sampler: Euler a, CFG scale: 7, Seed: 965400086, Size: 512x512, Model
         lines.append(lastline)
         lastline = ''
 
-    for i, line in enumerate(lines):
+    for line in lines:
         line = line.strip()
         if line.startswith("Negative prompt:"):
             done_with_prompt = True
@@ -173,14 +167,12 @@ Steps: 20, Sampler: Euler a, CFG scale: 7, Seed: 965400086, Size: 512x512, Model
         else:
             prompt += ("" if prompt == "" else "\n") + line
 
-    res["Prompt"] = prompt
-    res["Negative prompt"] = negative_prompt
-
+    res = {"Prompt": prompt, "Negative prompt": negative_prompt}
     for k, v in re_param.findall(lastline):
         m = re_imagesize.match(v)
         if m is not None:
-            res[k+"-1"] = m.group(1)
-            res[k+"-2"] = m.group(2)
+            res[f"{k}-1"] = m.group(1)
+            res[f"{k}-2"] = m.group(2)
         else:
             res[k] = v
 
@@ -203,11 +195,7 @@ def connect_paste(button, paste_fields, input_comp, jsfunc=None):
         res = []
 
         for output, key in paste_fields:
-            if callable(key):
-                v = key(params)
-            else:
-                v = params.get(key, None)
-
+            v = key(params) if callable(key) else params.get(key, None)
             if v is None:
                 res.append(gr.update())
             elif isinstance(v, type_of_gr_update):
@@ -216,11 +204,7 @@ def connect_paste(button, paste_fields, input_comp, jsfunc=None):
                 try:
                     valtype = type(output.value)
 
-                    if valtype == bool and v == "False":
-                        val = False
-                    else:
-                        val = valtype(v)
-
+                    val = False if valtype == bool and v == "False" else valtype(v)
                     res.append(gr.update(value=val))
                 except Exception:
                     res.append(gr.update())

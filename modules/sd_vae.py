@@ -125,13 +125,13 @@ def resolve_vae(checkpoint_file=None, vae_file="auto"):
     # if still not found, try look for ".vae.pt" beside model
     model_path = os.path.splitext(checkpoint_file)[0]
     if vae_file == "auto":
-        vae_file_try = model_path + ".vae.pt"
+        vae_file_try = f"{model_path}.vae.pt"
         if os.path.isfile(vae_file_try):
             vae_file = vae_file_try
             print(f"Using VAE found similar to selected model: {vae_file}")
     # if still not found, try look for ".vae.ckpt" beside model
     if vae_file == "auto":
-        vae_file_try = model_path + ".vae.ckpt"
+        vae_file_try = f"{model_path}.vae.ckpt"
         if os.path.isfile(vae_file_try):
             vae_file = vae_file_try
             print(f"Using VAE found similar to selected model: {vae_file}")
@@ -154,7 +154,11 @@ def load_vae(model, vae_file=None):
         print(f"Loading VAE weights from: {vae_file}")
         store_base_vae(model)
         vae_ckpt = torch.load(vae_file, map_location=shared.weight_load_location)
-        vae_dict_1 = {k: v for k, v in vae_ckpt["state_dict"].items() if k[0:4] != "loss" and k not in vae_ignore_keys}
+        vae_dict_1 = {
+            k: v
+            for k, v in vae_ckpt["state_dict"].items()
+            if k[:4] != "loss" and k not in vae_ignore_keys
+        }
         _load_vae_dict(model, vae_dict_1)
 
         # If vae used is not in dict, update it
@@ -208,5 +212,5 @@ def reload_vae_weights(sd_model=None, vae_file="auto"):
     if not shared.cmd_opts.lowvram and not shared.cmd_opts.medvram:
         sd_model.to(devices.device)
 
-    print(f"VAE Weights loaded.")
+    print("VAE Weights loaded.")
     return sd_model

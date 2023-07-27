@@ -74,7 +74,7 @@ class HypernetworkModule(torch.nn.Module):
             self.load_state_dict(state_dict)
         else:
             for layer in self.linear:
-                if type(layer) == torch.nn.Linear or type(layer) == torch.nn.LayerNorm:
+                if type(layer) in [torch.nn.Linear, torch.nn.LayerNorm]:
                     w, b = layer.weight.data, layer.bias.data
                     if weight_init == "Normal" or type(layer) == torch.nn.LayerNorm:
                         normal_(w, mean=0.0, std=0.01)
@@ -86,10 +86,20 @@ class HypernetworkModule(torch.nn.Module):
                         xavier_normal_(w)
                         zeros_(b)
                     elif weight_init == 'KaimingUniform':
-                        kaiming_uniform_(w, nonlinearity='leaky_relu' if 'leakyrelu' == activation_func else 'relu')
+                        kaiming_uniform_(
+                            w,
+                            nonlinearity='leaky_relu'
+                            if activation_func == 'leakyrelu'
+                            else 'relu',
+                        )
                         zeros_(b)
                     elif weight_init == 'KaimingNormal':
-                        kaiming_normal_(w, nonlinearity='leaky_relu' if 'leakyrelu' == activation_func else 'relu')
+                        kaiming_normal_(
+                            w,
+                            nonlinearity='leaky_relu'
+                            if activation_func == 'leakyrelu'
+                            else 'relu',
+                        )
                         zeros_(b)
                     else:
                         raise KeyError(f"Key {weight_init} is not defined as initialization!")
@@ -117,7 +127,7 @@ class HypernetworkModule(torch.nn.Module):
     def trainables(self):
         layer_structure = []
         for layer in self.linear:
-            if type(layer) == torch.nn.Linear or type(layer) == torch.nn.LayerNorm:
+            if type(layer) in [torch.nn.Linear, torch.nn.LayerNorm]:
                 layer_structure += [layer.weight, layer.bias]
         return layer_structure
 
@@ -143,7 +153,7 @@ class Hypernetwork:
         self.add_layer_norm = add_layer_norm
         self.use_dropout = use_dropout
         self.activate_output = activate_output
-        self.last_layer_dropout = kwargs['last_layer_dropout'] if 'last_layer_dropout' in kwargs else True
+        self.last_layer_dropout = kwargs.get('last_layer_dropout', True)
         self.optimizer_name = None
         self.optimizer_state_dict = None
 
@@ -178,12 +188,12 @@ class Hypernetwork:
                     param.requires_grad = False
 
     def save(self, filename):
-        state_dict = {}
         optimizer_saved_dict = {}
 
-        for k, v in self.layers.items():
-            state_dict[k] = (v[0].state_dict(), v[1].state_dict())
-
+        state_dict = {
+            k: (v[0].state_dict(), v[1].state_dict())
+            for k, v in self.layers.items()
+        }
         state_dict['step'] = self.step
         state_dict['name'] = self.name
         state_dict['layer_structure'] = self.layer_structure
@@ -203,7 +213,7 @@ class Hypernetwork:
         if shared.opts.save_optimizer_state and self.optimizer_state_dict:
             optimizer_saved_dict['hash'] = sd_models.model_hash(filename)
             optimizer_saved_dict['optimizer_state_dict'] = self.optimizer_state_dict
-            torch.save(optimizer_saved_dict, filename + '.optim')
+            torch.save(optimizer_saved_dict, f'{filename}.optim')
 
     def load(self, filename):
         self.filename = filename
@@ -226,7 +236,11 @@ class Hypernetwork:
         print(f"Activate last layer is set to {self.activate_output}")
         self.last_layer_dropout = state_dict.get('last_layer_dropout', False)
 
-        optimizer_saved_dict = torch.load(self.filename + '.optim', map_location = 'cpu') if os.path.exists(self.filename + '.optim') else {}
+        optimizer_saved_dict = (
+            torch.load(f'{self.filename}.optim', map_location='cpu')
+            if os.path.exists(f'{self.filename}.optim')
+            else {}
+        )
         self.optimizer_name = optimizer_saved_dict.get('optimizer_name', 'AdamW')
         print(f"Optimizer name is {self.optimizer_name}")
         if sd_models.model_hash(filename) == optimizer_saved_dict.get('hash', None):
@@ -259,7 +273,7 @@ def list_hypernetworks(path):
         name = os.path.splitext(os.path.basename(filename))[0]
         # Prevent a hypothetical "None.pt" from being listed.
         if name != "None":
-            res[name + f"({sd_models.model_hash(filename)})"] = filename
+            res[f"{name}({sd_models.model_hash(filename)})"] = filename
     return res
 
 
@@ -277,7 +291,7 @@ def load_hypernetwork(filename):
             print(traceback.format_exc(), file=sys.stderr)
     else:
         if shared.loaded_hypernetwork is not None:
-            print(f"Unloading hypernetwork")
+            print("Unloading hypernetwork")
 
         shared.loaded_hypernetwork = None
 
@@ -341,7 +355,7 @@ def stack_conds(conds):
         return torch.stack(conds)
 
     # same as in reconstruct_multicond_batch
-    token_count = max([x.shape[0] for x in conds])
+    token_count = max(x.shape[0] for x in conds)
     for i in range(len(conds)):
         if conds[i].shape[0] != token_count:
             last_vector = conds[i][-1:]
@@ -352,16 +366,10 @@ def stack_conds(conds):
 
 
 def statistics(data):
-    if len(data) < 2:
-        std = 0
-    else:
-        std = stdev(data)
+    std = 0 if len(data) < 2 else stdev(data)
     total_information = f"loss:{mean(data):.3f}" + u"\u00B1" + f"({std/ (len(data) ** 0.5):.3f})"
     recent_data = data[-32:]
-    if len(recent_data) < 2:
-        std = 0
-    else:
-        std = stdev(recent_data)
+    std = 0 if len(recent_data) < 2 else stdev(recent_data)
     recent_information = f"recent 32 loss:{mean(recent_data):.3f}" + u"\u00B1" + f"({std / (len(recent_data) ** 0.5):.3f})"
     return total_information, recent_information
 
@@ -370,7 +378,7 @@ def report_statistics(loss_info:dict):
     keys = sorted(loss_info.keys(), key=lambda x: sum(loss_info[x]) / len(loss_info[x]))
     for key in keys:
         try:
-            print("Loss statistics for file " + key)
+            print(f"Loss statistics for file {key}")
             info, recent = statistics(list(loss_info[key]))
             print(info)
             print(recent)

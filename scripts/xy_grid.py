@@ -36,12 +36,7 @@ def apply_prompt(p, x, xs):
 
 
 def apply_order(p, x, xs):
-    token_order = []
-
-    # Initally grab the tokens from the prompt, so they can be replaced in order of earliest seen
-    for token in x:
-        token_order.append((p.prompt.find(token), token))
-
+    token_order = [(p.prompt.find(token), token) for token in x]
     token_order.sort(key=lambda t: t[0])
 
     prompt_parts = []
@@ -49,7 +44,7 @@ def apply_order(p, x, xs):
     # Split the prompt up, taking out the tokens
     for _, token in token_order:
         n = p.prompt.find(token)
-        prompt_parts.append(p.prompt[0:n])
+        prompt_parts.append(p.prompt[:n])
         p.prompt = p.prompt[n + len(token):]
 
     # Rebuild the prompt with the tokens in the order we want
@@ -295,7 +290,7 @@ class Script(scripts.Script):
                         start = int(mc.group(1))
                         end   = int(mc.group(2))
                         num   = int(mc.group(3)) if mc.group(3) is not None else 1
-                        
+
                         valslist_ext += [int(x) for x in np.linspace(start=start, stop=end, num=num).tolist()]
                     else:
                         valslist_ext.append(val)
@@ -317,7 +312,7 @@ class Script(scripts.Script):
                         start = float(mc.group(1))
                         end   = float(mc.group(2))
                         num   = int(mc.group(3)) if mc.group(3) is not None else 1
-                        
+
                         valslist_ext += np.linspace(start=start, stop=end, num=num).tolist()
                     else:
                         valslist_ext.append(val)
@@ -342,7 +337,12 @@ class Script(scripts.Script):
 
         def fix_axis_seeds(axis_opt, axis_list):
             if axis_opt.label in ['Seed','Var. seed']:
-                return [int(random.randrange(4294967294)) if val is None or val == '' or val == -1 else val for val in axis_list]
+                return [
+                    random.randrange(4294967294)
+                    if val is None or val == '' or val == -1
+                    else val
+                    for val in axis_list
+                ]
             else:
                 return axis_list
 

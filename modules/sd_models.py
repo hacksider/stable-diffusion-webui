@@ -82,7 +82,7 @@ def list_models():
         title, short_model_name = modeltitle(filename, h)
 
         basename, _ = os.path.splitext(filename)
-        config = basename + ".yaml"
+        config = f"{basename}.yaml"
         if not os.path.exists(config):
             config = shared.cmd_opts.config
 
@@ -91,9 +91,7 @@ def list_models():
 
 def get_closet_checkpoint_match(searchString):
     applicable = sorted([info for info in checkpoints_list.values() if searchString in info.title], key = lambda x:len(x.title))
-    if len(applicable) > 0:
-        return applicable[0]
-    return None
+    return applicable[0] if len(applicable) > 0 else None
 
 
 def model_hash(filename):
@@ -104,7 +102,7 @@ def model_hash(filename):
 
             file.seek(0x100000)
             m.update(file.read(0x10000))
-            return m.hexdigest()[0:8]
+            return m.hexdigest()[:8]
     except FileNotFoundError:
         return 'NOFILE'
 
@@ -116,13 +114,19 @@ def select_checkpoint():
         return checkpoint_info
 
     if len(checkpoints_list) == 0:
-        print(f"No checkpoints found. When searching for checkpoints, looked at:", file=sys.stderr)
+        print(
+            "No checkpoints found. When searching for checkpoints, looked at:",
+            file=sys.stderr,
+        )
         if shared.cmd_opts.ckpt is not None:
             print(f" - file {os.path.abspath(shared.cmd_opts.ckpt)}", file=sys.stderr)
         print(f" - directory {model_path}", file=sys.stderr)
         if shared.cmd_opts.ckpt_dir is not None:
             print(f" - directory {os.path.abspath(shared.cmd_opts.ckpt_dir)}", file=sys.stderr)
-        print(f"Can't run without a checkpoint. Find and place a .ckpt file into any of those locations. The program will exit.", file=sys.stderr)
+        print(
+            "Can't run without a checkpoint. Find and place a .ckpt file into any of those locations. The program will exit.",
+            file=sys.stderr,
+        )
         exit(1)
 
     checkpoint_info = next(iter(checkpoints_list.values()))
@@ -174,8 +178,7 @@ def read_state_dict(checkpoint_file, print_global_state=False, map_location=None
     if print_global_state and "global_step" in pl_sd:
         print(f"Global Step: {pl_sd['global_step']}")
 
-    sd = get_state_dict_from_checkpoint(pl_sd)
-    return sd
+    return get_state_dict_from_checkpoint(pl_sd)
 
 
 def load_model_weights(model, checkpoint_info, vae_file="auto"):
@@ -289,7 +292,7 @@ def load_model(checkpoint_info=None):
         devices.torch_gc()
 
     sd_config = OmegaConf.load(checkpoint_info.config)
-    
+
     if should_hijack_inpainting(checkpoint_info):
         # Hardcoded config for now...
         sd_config.model.target = "ldm.models.diffusion.ddpm.LatentInpaintDiffusion"
@@ -320,14 +323,14 @@ def load_model(checkpoint_info=None):
 
     script_callbacks.model_loaded_callback(sd_model)
 
-    print(f"Model loaded.")
+    print("Model loaded.")
     return sd_model
 
 
 def reload_model_weights(sd_model=None, info=None):
     from modules import lowvram, devices, sd_hijack
     checkpoint_info = info or select_checkpoint()
- 
+
     if not sd_model:
         sd_model = shared.sd_model
 
@@ -355,5 +358,5 @@ def reload_model_weights(sd_model=None, info=None):
     if not shared.cmd_opts.lowvram and not shared.cmd_opts.medvram:
         sd_model.to(devices.device)
 
-    print(f"Weights loaded.")
+    print("Weights loaded.")
     return sd_model

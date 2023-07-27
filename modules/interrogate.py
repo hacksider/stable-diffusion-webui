@@ -107,10 +107,12 @@ class InterrogateModels:
         import clip
 
         if shared.opts.interrogate_clip_dict_limit != 0:
-            text_array = text_array[0:int(shared.opts.interrogate_clip_dict_limit)]
+            text_array = text_array[:int(shared.opts.interrogate_clip_dict_limit)]
 
         top_count = min(top_count, len(text_array))
-        text_tokens = clip.tokenize([text for text in text_array], truncate=True).to(devices.device_interrogate)
+        text_tokens = clip.tokenize(list(text_array), truncate=True).to(
+            devices.device_interrogate
+        )
         text_features = self.clip_model.encode_text(text_tokens).type(self.dtype)
         text_features /= text_features.norm(dim=-1, keepdim=True)
 
@@ -153,15 +155,21 @@ class InterrogateModels:
 
             clip_image = self.clip_preprocess(pil_image).unsqueeze(0).type(self.dtype).to(devices.device_interrogate)
 
-            with torch.no_grad(), devices.autocast():
+            with (torch.no_grad(), devices.autocast()):
                 image_features = self.clip_model.encode_image(clip_image).type(self.dtype)
 
                 image_features /= image_features.norm(dim=-1, keepdim=True)
 
                 if shared.opts.interrogate_use_builtin_artists:
-                    artist = self.rank(image_features, ["by " + artist.name for artist in shared.artist_db.artists])[0]
+                    artist = self.rank(
+                        image_features,
+                        [
+                            f"by {artist.name}"
+                            for artist in shared.artist_db.artists
+                        ],
+                    )[0]
 
-                    res += ", " + artist[0]
+                    res += f", {artist[0]}"
 
                 for name, topn, items in self.categories:
                     matches = self.rank(image_features, items, top_count=topn)
@@ -169,10 +177,10 @@ class InterrogateModels:
                         if shared.opts.interrogate_return_ranks:
                             res += f", ({match}:{score/100:.3f})"
                         else:
-                            res += ", " + match
+                            res += f", {match}"
 
         except Exception:
-            print(f"Error interrogating", file=sys.stderr)
+            print("Error interrogating", file=sys.stderr)
             print(traceback.format_exc(), file=sys.stderr)
             res += "<error>"
 

@@ -35,8 +35,7 @@ opt_f = 8
 
 def setup_color_correction(image):
     logging.info("Calibrating color correction.")
-    correction_target = cv2.cvtColor(np.asarray(image.copy()), cv2.COLOR_RGB2LAB)
-    return correction_target
+    return cv2.cvtColor(np.asarray(image.copy()), cv2.COLOR_RGB2LAB)
 
 
 def apply_color_correction(correction, image):
@@ -178,19 +177,18 @@ class StableDiffusionProcessing():
         self.is_using_inpainting_conditioning = True
 
         # Handle the different mask inputs
-        if image_mask is not None:
-            if torch.is_tensor(image_mask):
-                conditioning_mask = image_mask
-            else:
-                conditioning_mask = np.array(image_mask.convert("L"))
-                conditioning_mask = conditioning_mask.astype(np.float32) / 255.0
-                conditioning_mask = torch.from_numpy(conditioning_mask[None, None])
-
-                # Inpainting model uses a discretized mask as input, so we round to either 1.0 or 0.0
-                conditioning_mask = torch.round(conditioning_mask)
-        else:
+        if image_mask is None:
             conditioning_mask = source_image.new_ones(1, 1, *source_image.shape[-2:])
 
+        elif torch.is_tensor(image_mask):
+            conditioning_mask = image_mask
+        else:
+            conditioning_mask = np.array(image_mask.convert("L"))
+            conditioning_mask = conditioning_mask.astype(np.float32) / 255.0
+            conditioning_mask = torch.from_numpy(conditioning_mask[None, None])
+
+            # Inpainting model uses a discretized mask as input, so we round to either 1.0 or 0.0
+            conditioning_mask = torch.round(conditioning_mask)
         # Create another latent image, this time with a masked version of the original input.
         # Smoothly interpolate between the masked and unmasked latent conditioning image using a parameter.
         conditioning_mask = conditioning_mask.to(source_image.device).to(source_image.dtype)
@@ -199,7 +197,7 @@ class StableDiffusionProcessing():
             source_image * (1.0 - conditioning_mask),
             getattr(self, "inpainting_mask_weight", shared.opts.inpainting_mask_weight)
         )
-        
+
         # Encode the new masked image using first stage of network.
         conditioning_image = self.sd_model.get_first_stage_encoding(self.sd_model.encode_first_stage(conditioning_image))
 
@@ -329,8 +327,9 @@ def slerp(val, low, high):
 
     omega = torch.acos(dot)
     so = torch.sin(omega)
-    res = (torch.sin((1.0-val)*omega)/so).unsqueeze(1)*low + (torch.sin(val*omega)/so).unsqueeze(1) * high
-    return res
+    return (torch.sin((1.0 - val) * omega) / so).unsqueeze(1) * low + (
+        torch.sin(val * omega) / so
+    ).unsqueeze(1) * high
 
 
 def create_random_tensors(shape, seeds, subseeds=None, subseed_strength=0.0, seed_resize_from_h=0, seed_resize_from_w=0, p=None):
@@ -369,8 +368,8 @@ def create_random_tensors(shape, seeds, subseeds=None, subseed_strength=0.0, see
             dy = (shape[1] - noise_shape[1]) // 2
             w = noise_shape[2] if dx >= 0 else noise_shape[2] + 2 * dx
             h = noise_shape[1] if dy >= 0 else noise_shape[1] + 2 * dy
-            tx = 0 if dx < 0 else dx
-            ty = 0 if dy < 0 else dy
+            tx = max(dx, 0)
+            ty = max(dy, 0)
             dx = max(-dx, 0)
             dy = max(-dy, 0)
 
@@ -404,7 +403,7 @@ def decode_first_stage(model, x):
 
 def get_fixed_seed(seed):
     if seed is None or seed == '' or seed == -1:
-        return int(random.randrange(4294967294))
+        return random.randrange(4294967294)
 
     return seed
 
@@ -442,7 +441,7 @@ def create_infotext(p, all_prompts, all_seeds, all_subseeds, comments, iteration
         "ENSD": None if opts.eta_noise_seed_delta == 0 else opts.eta_noise_seed_delta,
     }
 
-    generation_params.update(p.extra_generation_params)
+    generation_params |= p.extra_generation_params
 
     generation_params_text = ", ".join([k if k == v else f'{k}: {generation_parameters_copypaste.quote(v)}' for k, v in generation_params.items() if v is not None])
 

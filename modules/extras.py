@@ -218,16 +218,17 @@ def run_pnginfo(image):
     geninfo, items = images.read_info_from_image(image)
     items = {**{'parameters': geninfo}, **items}
 
-    info = ''
-    for key, text in items.items():
-        info += f"""
+    info = ''.join(
+        f"""
 <div>
 <p><b>{plaintext_to_html(str(key))}</b></p>
 <p>{plaintext_to_html(str(text))}</p>
 </div>
-""".strip()+"\n"
-
-    if len(info) == 0:
+""".strip()
+        + "\n"
+        for key, text in items.items()
+    )
+    if not info:
         message = "Nothing found in the image."
         info = f"<div><p>{message}<p></div>"
 
@@ -287,7 +288,10 @@ def run_modelmerger(primary_model_name, secondary_model_name, tertiary_model_nam
             # this enables merging an inpainting model (A) with another one (B);
             # where normal model would have 4 channels, for latenst space, inpainting model would
             # have another 4 channels for unmasked picture's latent space, plus one channel for mask, for a total of 9
-            if a.shape != b.shape and a.shape[0:1] + a.shape[2:] == b.shape[0:1] + b.shape[2:]:
+            if (
+                a.shape != b.shape
+                and a.shape[:1] + a.shape[2:] == b.shape[:1] + b.shape[2:]
+            ):
                 if a.shape[1] == 4 and b.shape[1] == 9:
                     raise RuntimeError("When merging inpainting model with a normal one, A must be the inpainting model.")
 
@@ -311,15 +315,21 @@ def run_modelmerger(primary_model_name, secondary_model_name, tertiary_model_nam
 
     ckpt_dir = shared.cmd_opts.ckpt_dir or sd_models.model_path
 
-    filename = \
-        primary_model_info.model_name + '_' + str(round(1-multiplier, 2)) + '-' + \
-        secondary_model_info.model_name + '_' + str(round(multiplier, 2)) + '-' + \
-        interp_method.replace(" ", "_") + \
-        '-merged.' +  \
-        ("inpainting." if result_is_inpainting_model else "") + \
-        checkpoint_format
+    filename = (
+        (
+            (
+                f'{primary_model_info.model_name}_{str(round(1 - multiplier, 2))}-{secondary_model_info.model_name}_{str(round(multiplier, 2))}-'
+                + interp_method.replace(" ", "_")
+            )
+            + '-merged.'
+        )
+        + ("inpainting." if result_is_inpainting_model else "")
+        + checkpoint_format
+    )
 
-    filename = filename if custom_name == '' else (custom_name + '.' + checkpoint_format)
+    filename = (
+        filename if custom_name == '' else f'{custom_name}.{checkpoint_format}'
+    )
 
     output_modelname = os.path.join(ckpt_dir, filename)
 
@@ -334,4 +344,7 @@ def run_modelmerger(primary_model_name, secondary_model_name, tertiary_model_nam
     sd_models.list_models()
 
     print("Checkpoint saved.")
-    return ["Checkpoint saved to " + output_modelname] + [gr.Dropdown.update(choices=sd_models.checkpoint_tiles()) for _ in range(4)]
+    return [f"Checkpoint saved to {output_modelname}"] + [
+        gr.Dropdown.update(choices=sd_models.checkpoint_tiles())
+        for _ in range(4)
+    ]

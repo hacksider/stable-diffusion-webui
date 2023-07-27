@@ -156,7 +156,12 @@ def draw_grid_annotations(im, width, height, hor_texts, ver_texts):
     color_active = (0, 0, 0)
     color_inactive = (153, 153, 153)
 
-    pad_left = 0 if sum([sum([len(line.text) for line in lines]) for lines in ver_texts]) == 0 else width * 3 // 4
+    pad_left = (
+        0
+        if sum(sum(len(line.text) for line in lines) for lines in ver_texts)
+        == 0
+        else width * 3 // 4
+    )
 
     cols = im.width // width
     rows = im.height // height
@@ -179,9 +184,15 @@ def draw_grid_annotations(im, width, height, hor_texts, ver_texts):
             bbox = calc_d.multiline_textbbox((0, 0), line.text, font=fnt)
             line.size = (bbox[2] - bbox[0], bbox[3] - bbox[1])
 
-    hor_text_heights = [sum([line.size[1] + line_spacing for line in lines]) - line_spacing for lines in hor_texts]
-    ver_text_heights = [sum([line.size[1] + line_spacing for line in lines]) - line_spacing * len(lines) for lines in
-                        ver_texts]
+    hor_text_heights = [
+        sum(line.size[1] + line_spacing for line in lines) - line_spacing
+        for lines in hor_texts
+    ]
+    ver_text_heights = [
+        sum(line.size[1] + line_spacing for line in lines)
+        - line_spacing * len(lines)
+        for lines in ver_texts
+    ]
 
     pad_top = max(hor_text_heights) + line_spacing * 2
 
@@ -227,7 +238,7 @@ def resize_image(resize_mode, im, width, height):
 
         if scale > 1.0:
             upscalers = [x for x in shared.sd_upscalers if x.name == opts.upscaler_for_img2img]
-            assert len(upscalers) > 0, f"could not find upscaler named {opts.upscaler_for_img2img}"
+            assert upscalers, f"could not find upscaler named {opts.upscaler_for_img2img}"
 
             upscaler = upscalers[0]
             im = upscaler.scaler.upscale(im, scale, upscaler.data_path)
@@ -339,14 +350,17 @@ class FilenameGenerator:
 
     def prompt_words(self):
         words = [x for x in re_nonletters.split(self.prompt or "") if len(x) > 0]
-        if len(words) == 0:
+        if not words:
             words = ["empty"]
-        return sanitize_filename_part(" ".join(words[0:opts.directories_max_prompt_words]), replace_spaces=False)
+        return sanitize_filename_part(
+            " ".join(words[: opts.directories_max_prompt_words]),
+            replace_spaces=False,
+        )
 
     def datetime(self, *args):
         time_datetime = datetime.datetime.now()
 
-        time_format = args[0] if len(args) > 0 and args[0] != "" else self.default_time_format
+        time_format = args[0] if args and args[0] != "" else self.default_time_format
         try:
             time_zone = pytz.timezone(args[1]) if len(args) > 1 else None
         except pytz.exceptions.UnknownTimeZoneError as _:
@@ -405,7 +419,7 @@ def get_next_sequence_number(path, basename):
     """
     result = -1
     if basename != '':
-        basename = basename + "-"
+        basename = f"{basename}-"
 
     prefix_length = len(basename)
     for p in os.listdir(path):
@@ -474,7 +488,7 @@ def save_image(image, path, basename, seed=None, prompt=None, extension='png', i
         add_number = opts.save_images_add_number or file_decoration == ''
 
         if file_decoration != "" and add_number:
-            file_decoration = "-" + file_decoration
+            file_decoration = f"-{file_decoration}"
 
         file_decoration = namegen.apply(file_decoration) + suffix
 
@@ -504,7 +518,7 @@ def save_image(image, path, basename, seed=None, prompt=None, extension='png', i
 
     def _atomically_save_image(image_to_save, filename_without_extension, extension):
         # save image with .tmp extension to avoid race condition when another process detects new image in the directory
-        temp_file_path = filename_without_extension + ".tmp"
+        temp_file_path = f"{filename_without_extension}.tmp"
         image_format = Image.registered_extensions()[extension]
 
         if extension.lower() == '.png':
@@ -590,7 +604,7 @@ def read_info_from_image(image):
 Negative prompt: {json_info["uc"]}
 Steps: {json_info["steps"]}, Sampler: {sampler}, CFG scale: {json_info["scale"]}, Seed: {json_info["seed"]}, Size: {image.width}x{image.height}, Clip skip: 2, ENSD: 31337"""
         except Exception:
-            print(f"Error parsing NovelAI iamge generation parameters:", file=sys.stderr)
+            print("Error parsing NovelAI iamge generation parameters:", file=sys.stderr)
             print(traceback.format_exc(), file=sys.stderr)
 
     return geninfo, items
